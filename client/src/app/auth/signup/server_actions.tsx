@@ -3,27 +3,23 @@ import  prisma  from '@/lib/prisma';
 import bcrypt from 'bcrypt';
 
 
-export const create_user = async (name: string, email: string, password: string | Buffer) => {
-  // Hash the password
+export const create_user = async (name: string, display_name: string, password: string | Buffer) => {
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Check if the email already exists in the User table
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { display_name },
   });
 
   if (existingUser) {
-    return { status: 400, error: 'This email is already associated with an account or to a google account.' };
+    return { status: 400, error: 'This display_name is already associated with an account' };
   }
 
-  // Save the user to the database
   try {
     await prisma.user.create({
       data: {
         name,
-        email,
+        display_name,
         password: hashedPassword,
-        type: 'LOCAL',
       },
     });
     return { status: 200 };
@@ -32,3 +28,15 @@ export const create_user = async (name: string, email: string, password: string 
     return { status: 400, error: 'An error occurred while creating the user.' };
   }
 };
+
+export const check_display_name_availability = async (display_name: string) => {
+  const existingUser = await prisma.user.findUnique({
+    where: { display_name },
+  });
+
+  if (existingUser) {
+    return false;
+  }
+
+  return true;
+}

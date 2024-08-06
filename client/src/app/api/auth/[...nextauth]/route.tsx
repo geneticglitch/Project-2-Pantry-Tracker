@@ -1,25 +1,22 @@
-import { User } from "next-auth";
 import NextAuth, { NextAuthOptions } from "next-auth"
 import { DefaultSession } from "next-auth"
-import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
-import { authenticate_user, handle_google_login } from "@/app/api/auth/[...nextauth]/server_actions"
+import { authenticate_user } from "@/app/api/auth/[...nextauth]/server_actions"
 
 declare module "next-auth" {
-  interface Session {
-    user?: {
+  interface Session extends DefaultSession {
+    user: {
       id: string;
       display_name: string;
-    } & DefaultSession["user"];
+      name: string;
+    } & DefaultSession["user"]
   }
+
   interface User {
     id: string;
-    display_name?: string;
+    display_name: string;
+    name: string;
   }
-}
-
-if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-  throw new Error('OAuth environment variables are not set.');
 }
 
 export const authOptions: NextAuthOptions = {
@@ -30,46 +27,32 @@ export const authOptions: NextAuthOptions = {
     Credentials({
       name: 'Sign in',
       credentials: {
-        email: { label: 'Email', type: 'email'},
+        display_name: { label: 'text', type: 'text'},
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        if (!credentials || !credentials.email || !credentials.password) {
+        if (!credentials || !credentials.display_name || !credentials.password) {
           return null;
         }
-        const user = await authenticate_user(credentials.email, credentials.password);
+        const user = await authenticate_user(credentials.display_name, credentials.password);
+       
         if (user) {
           return {
             id: String(user.id),
-            email: user.email,
+            display_name: user.display_name,
             name: user.name,
           };
         }
         return null;
       },
     }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-    })
   ],
   callbacks: {
-    async signIn({ account, profile, user }) {
-      if (account?.provider === 'google') {
-        const google_user = await handle_google_login(account, profile);
-        if (google_user) {
-          user.id = google_user.id;
-          user.name = google_user.name;
-          user.email = google_user.email;
-          return true;
-        }
-        return false; 
-      }
-      return true; 
-    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.display_name = user.display_name;
+        token.name = user.name;
       }
       return token;
     },
@@ -79,6 +62,8 @@ export const authOptions: NextAuthOptions = {
         user: {
           ...session.user,
           id: token.id as string,
+          display_name: token.display_name as string,
+          name: token.name as string,
         },
       };
     },
